@@ -81,6 +81,7 @@ class StockInfoFrame(wx.Frame):
     def __init__(self, *args, **kw):
         super(StockInfoFrame, self).__init__(*args, **kw)
         self.SetTransparent(100)
+        self.SetWindowStyle(self.GetWindowStyle() | wx.STAY_ON_TOP)
         self.panel = wx.Panel(self)
         self.list_ctrl = wx.ListCtrl(self.panel, style=wx.LC_REPORT | wx.LC_HRULES | wx.LC_VRULES)
 
