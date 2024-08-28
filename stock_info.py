@@ -265,9 +265,9 @@ class EditDialog(wx.Dialog):
 
 
 if __name__ == "__main__":
+    load_config()
     app = wx.App(False)
     main_frame = StockInfoFrame(None)
-
 
     def on_global_hotkey():
         if main_frame.is_hidden:
@@ -279,5 +279,4 @@ if __name__ == "__main__":
 
 
     keyboard.add_hotkey('ctrl+~', on_global_hotkey, suppress=True)
-    load_config()
     app.MainLoop()
