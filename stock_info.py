@@ -1,8 +1,9 @@
-import wx
 import json
-import requests
 import random
-import keyboard
+
+import requests
+import wx
+from pynput import keyboard
 
 # 配置文件路径
 config_file_path = "stock_hold_info.json"
@@ -11,31 +12,30 @@ config_file_path = "stock_hold_info.json"
 hold_info = {}
 window_pos = None
 window_size = None
-is_init = True
 
 
 def load_config():
-    global hold_info, window_pos, window_size, is_init
+    global hold_info, window_pos, window_size
     try:
         with open(config_file_path, "r") as config_file:
             config_data = json.load(config_file)
-            is_init = config_data.get('is_init', True)
             hold_info = config_data.get('hold_info', {})
             window_pos_tuple = config_data.get('window_pos')
             window_size_tuple = config_data.get('window_size')
-            if window_pos_tuple and window_size_tuple:
-                window_pos = wx.Point(*window_pos_tuple)
-                window_size = wx.Size(*window_size_tuple)
+            window_pos = wx.Point(*window_pos_tuple) if window_pos_tuple else wx.DefaultPosition
+            window_size = wx.Size(*window_size_tuple) if window_size_tuple else wx.DefaultSize
     except FileNotFoundError:
-        pass
+        window_pos = wx.DefaultPosition
+        window_size = wx.DefaultSize
     except json.JSONDecodeError:
         hold_info = {}
+        window_pos = wx.DefaultPosition
+        window_size = wx.DefaultSize
 
 
 def save_config():
     global window_pos, window_size
     config_data = {
-        'is_init': is_init,
         'hold_info': hold_info,
         'window_pos': (window_pos.x, window_pos.y),
         'window_size': (window_size.width, window_size.height)
@@ -306,24 +306,34 @@ def on_exit_hotkey():
     wx.Exit()
 
 
+def on_press(key):
+    global ctrl_pressed
+    try:
+        if key == keyboard.Key.ctrl_l or key == keyboard.Key.ctrl_r:
+            ctrl_pressed = True
+        if key == keyboard.KeyCode.from_char('`') and ctrl_pressed:
+            on_global_hotkey()
+        elif key == keyboard.KeyCode.from_char('\\') and ctrl_pressed:
+            on_exit_hotkey()
+    except AttributeError:
+        pass
+
+
+def on_release(key):
+    global ctrl_pressed
+    if key == keyboard.Key.ctrl_l or key == keyboard.Key.ctrl_r:
+        ctrl_pressed = False
+
+
 if __name__ == "__main__":
     load_config()
     app = wx.App(False)
     main_frame = StockInfoFrame(None)
 
-    keyboard.add_hotkey('ctrl+~', on_global_hotkey, suppress=True)
-    keyboard.add_hotkey('ctrl+\\', on_exit_hotkey, suppress=True)
+    ctrl_pressed = False
 
-    def check_hotkey():
-        if not keyboard.is_pressed('ctrl+~'):
-            keyboard.remove_hotkey('ctrl+~')
-            keyboard.remove_hotkey('ctrl+\\')
-            keyboard.add_hotkey('ctrl+~', on_global_hotkey, suppress=True)
-            keyboard.add_hotkey('ctrl+\\', on_exit_hotkey, suppress=True)
-
-
-    check_timer = wx.Timer(main_frame)
-    main_frame.Bind(wx.EVT_TIMER, lambda event: check_hotkey(), check_timer)
-    check_timer.Start(10000)  # 每10秒检查一次
+    listener = keyboard.Listener(on_press=on_press, on_release=on_release, suppress=True)
+    listener.start()
 
     app.MainLoop()
+    listener.stop()
