@@ -292,20 +292,38 @@ class DelDialog(wx.Dialog):
                 self.stock_code_choice.SetStringSelection("")
 
 
+def on_global_hotkey():
+    if main_frame.is_hidden:
+        main_frame.Show()
+        main_frame.Raise()
+        main_frame.is_hidden = False
+    else:
+        main_frame.Hide()
+        main_frame.is_hidden = True
+
+
+def on_exit_hotkey():
+    wx.Exit()
+
+
 if __name__ == "__main__":
     load_config()
     app = wx.App(False)
     main_frame = StockInfoFrame(None)
 
-
-    def on_global_hotkey():
-        if main_frame.is_hidden:
-            main_frame.Show()
-            main_frame.is_hidden = False
-        else:
-            main_frame.Hide()
-            main_frame.is_hidden = True
-
-
     keyboard.add_hotkey('ctrl+~', on_global_hotkey, suppress=True)
+    keyboard.add_hotkey('ctrl+\\', on_exit_hotkey, suppress=True)
+
+    def check_hotkey():
+        if not keyboard.is_pressed('ctrl+~'):
+            keyboard.remove_hotkey('ctrl+~')
+            keyboard.remove_hotkey('ctrl+\\')
+            keyboard.add_hotkey('ctrl+~', on_global_hotkey, suppress=True)
+            keyboard.add_hotkey('ctrl+\\', on_global_hotkey, suppress=True)
+
+
+    check_timer = wx.Timer(main_frame)
+    main_frame.Bind(wx.EVT_TIMER, lambda event: check_hotkey(), check_timer)
+    check_timer.Start(10000)  # 每10秒检查一次
+
     app.MainLoop()
