@@ -319,7 +319,7 @@ if __name__ == "__main__":
             keyboard.remove_hotkey('ctrl+~')
             keyboard.remove_hotkey('ctrl+\\')
             keyboard.add_hotkey('ctrl+~', on_global_hotkey, suppress=True)
-            keyboard.add_hotkey('ctrl+\\', on_global_hotkey, suppress=True)
+            keyboard.add_hotkey('ctrl+\\', on_exit_hotkey, suppress=True)
 
 
     check_timer = wx.Timer(main_frame)
