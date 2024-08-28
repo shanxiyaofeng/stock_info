@@ -114,11 +114,15 @@ class StockInfoFrame(wx.Frame):
 
         self.menu_bar = wx.MenuBar()
         edit_menu = wx.Menu()
-        self.menu_bar.Append(edit_menu, "&编辑")
+        self.menu_bar.Append(edit_menu, "&操作")
         self.SetMenuBar(self.menu_bar)
 
+        add_menu_item = edit_menu.Append(wx.ID_ADD, "新增")
+        self.Bind(wx.EVT_MENU, self.on_add_button, add_menu_item)
         edit_menu_item = edit_menu.Append(wx.ID_EDIT, "编辑")
         self.Bind(wx.EVT_MENU, self.on_edit_button, edit_menu_item)
+        del_menu_item = edit_menu.Append(wx.ID_DELETE, "删除")
+        self.Bind(wx.EVT_MENU, self.on_del_button, del_menu_item)
 
         self.adjust_size_to_content()
         self.Bind(wx.EVT_SIZE, self.on_size)
@@ -132,7 +136,7 @@ class StockInfoFrame(wx.Frame):
         data_list = get_stock_data(codes)
         for data in data_list:
             stock_data_list = data.split('~')
-            stock_code = stock_data_list[0].split('=')[0].replace('v_', '')
+            stock_code = stock_data_list[0].split('=')[0].replace('v_', '').replace('\n', '')
             stock_name = stock_data_list[1]
             latest_price = stock_data_list[3]
             change = stock_data_list[31]
@@ -164,8 +168,14 @@ class StockInfoFrame(wx.Frame):
         window_size = self.GetSize()
         save_config()
 
+    def on_add_button(self, event):
+        AddDialog(self).ShowModal()
+
     def on_edit_button(self, event):
         EditDialog(self).ShowModal()
+
+    def on_del_button(self, event):
+        DelDialog(self).ShowModal()
 
     def on_size(self, event):
         self.save_window_pos_and_size()
@@ -176,9 +186,42 @@ class StockInfoFrame(wx.Frame):
         event.Skip()
 
 
+class AddDialog(wx.Dialog):
+    def __init__(self, parent):
+        super(AddDialog, self).__init__(parent, title="新增")
+        vbox = wx.BoxSizer(wx.VERTICAL)
+
+        self.add_stock_input = wx.TextCtrl(self)
+        self.add_stock_input.SetHint("请输入股票代码")
+        vbox.Add(self.add_stock_input, 0, wx.EXPAND | wx.ALL, 5)
+
+        add_button = wx.Button(self, label="添加")
+        self.Bind(wx.EVT_BUTTON, self.on_add_button, add_button)
+        vbox.Add(add_button, 0, wx.EXPAND | wx.ALL, 5)
+
+        button_sizer = wx.StdDialogButtonSizer()
+        button_sizer.Realize()
+        vbox.Add(button_sizer, 0, wx.EXPAND | wx.ALL, 5)
+
+        self.SetSizer(vbox)
+        self.Fit()
+
+    def on_add_button(self, event):
+        stock_code = self.add_stock_input.GetValue().strip()
+        if stock_code:
+            try:
+                data_list = get_stock_data([stock_code])
+                if data_list:
+                    stock_name = data_list[0].split('~')[1]
+                    hold_info[stock_code] = {'cost': 0.0, 'hold_num': 0}
+                    save_config()
+            except Exception as e:
+                wx.MessageBox(f"处理数据时出错: {e}", "错误", wx.OK | wx.ICON_ERROR)
+
+
 class EditDialog(wx.Dialog):
     def __init__(self, parent):
-        super(EditDialog, self).__init__(parent, title="编辑股票信息")
+        super(EditDialog, self).__init__(parent, title="编辑")
         vbox = wx.BoxSizer(wx.VERTICAL)
 
         self.stock_code_list = list(hold_info.keys())
@@ -195,19 +238,6 @@ class EditDialog(wx.Dialog):
         self.hold_num_input = wx.TextCtrl(self)
         vbox.Add(self.hold_num_input, 0, wx.EXPAND | wx.ALL, 5)
 
-        self.add_stock_text = wx.StaticText(self, label="添加股票:")
-        vbox.Add(self.add_stock_text, 0, wx.ALIGN_LEFT | wx.LEFT, 10)
-        self.add_stock_input = wx.TextCtrl(self)
-        vbox.Add(self.add_stock_input, 0, wx.EXPAND | wx.ALL, 5)
-
-        add_button = wx.Button(self, label="添加")
-        self.Bind(wx.EVT_BUTTON, self.on_add_button, add_button)
-        vbox.Add(add_button, 0, wx.EXPAND | wx.ALL, 5)
-
-        delete_button = wx.Button(self, label="删除")
-        self.Bind(wx.EVT_BUTTON, self.on_delete_button, delete_button)
-        vbox.Add(delete_button, 0, wx.EXPAND | wx.ALL, 5)
-
         button_sizer = wx.StdDialogButtonSizer()
         ok_button = wx.Button(self, wx.ID_OK)
         ok_button.Bind(wx.EVT_BUTTON, self.on_ok_button)
@@ -219,14 +249,6 @@ class EditDialog(wx.Dialog):
 
         self.SetSizer(vbox)
         self.Fit()
-        self.update_controls()
-
-    def update_controls(self):
-        selected_stock_code = self.stock_code_choice.GetStringSelection()
-        if selected_stock_code:
-            stock_info = hold_info.get(selected_stock_code, {})
-            self.cost_input.SetValue(str(stock_info.get('cost', 0.0)))
-            self.hold_num_input.SetValue(str(stock_info.get('hold_num', 0)))
 
     def on_ok_button(self, event):
         selected_stock_code = self.stock_code_choice.GetStringSelection()
@@ -237,20 +259,26 @@ class EditDialog(wx.Dialog):
             save_config()
             self.EndModal(wx.ID_OK)
 
-    def on_add_button(self, event):
-        stock_code = self.add_stock_input.GetValue().strip()
-        if stock_code:
-            try:
-                data_list = get_stock_data([stock_code])
-                if data_list:
-                    stock_name = data_list[0].split('~')[1]
-                    hold_info[stock_code] = {'cost': 0.0, 'hold_num': 0}
-                    save_config()
-                    self.stock_code_choice.Append(stock_code)
-                    self.stock_code_choice.SetStringSelection(stock_code)
-                    self.update_controls()
-            except Exception as e:
-                wx.MessageBox(f"处理数据时出错: {e}", "错误", wx.OK | wx.ICON_ERROR)
+
+class DelDialog(wx.Dialog):
+    def __init__(self, parent):
+        super(DelDialog, self).__init__(parent, title="删除")
+        vbox = wx.BoxSizer(wx.VERTICAL)
+
+        self.stock_code_list = list(hold_info.keys())
+        self.stock_code_choice = wx.Choice(self, choices=self.stock_code_list)
+        vbox.Add(self.stock_code_choice, 0, wx.EXPAND | wx.ALL, 5)
+
+        delete_button = wx.Button(self, label="删除")
+        self.Bind(wx.EVT_BUTTON, self.on_delete_button, delete_button)
+        vbox.Add(delete_button, 0, wx.EXPAND | wx.ALL, 5)
+
+        button_sizer = wx.StdDialogButtonSizer()
+        button_sizer.Realize()
+        vbox.Add(button_sizer, 0, wx.EXPAND | wx.ALL, 5)
+
+        self.SetSizer(vbox)
+        self.Fit()
 
     def on_delete_button(self, event):
         selected_stock_code = self.stock_code_choice.GetStringSelection()
@@ -261,13 +289,13 @@ class EditDialog(wx.Dialog):
                 save_config()
                 self.stock_code_choice.Delete(self.stock_code_choice.GetSelection())
                 self.stock_code_choice.SetStringSelection("")
-                self.update_controls()
 
 
 if __name__ == "__main__":
     load_config()
     app = wx.App(False)
     main_frame = StockInfoFrame(None)
+
 
     def on_global_hotkey():
         if main_frame.is_hidden:
